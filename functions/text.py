@@ -75,3 +75,9 @@ productos = [
             "imagen": "assets/productsImg/grajea.png"
         }
     ]
+
+mensajes = [
+    "📣 *Ana, SLP:* “Pedi una caja para mi aniversario y fue perfecta. ¡Gracias Costanzo!”",
+    "📣 *Alan, SLP:* “Los chocolates rellenos de cajeta son una joya.”",
+    "📣 *Aneth, SLP:* “El empaque personalizado fue lo mejor. Ideal para regalar.”"
+    ]

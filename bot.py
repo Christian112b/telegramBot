@@ -103,48 +103,70 @@ def show_products(call):
     Ruta: pedido_personalizado
 """
 # Diccionario temporal para almacenar datos por usuario
-user_pedidos = {}
 
+# Iniciar el flujo de pedido personalizado
 @bot.callback_query_handler(func=lambda call: call.data == "pedido_personalizado")
-def iniciar_pedido(call):
-    bot.send_message(call.message.chat.id, "¿Para qué ocasión es tu pedido? (Ej. cumpleaños, aniversario, evento corporativo)")
-    bot.register_next_step_handler(call.message, recibir_ocasion)
+def start_order(call):
+    iniciar_pedido_personalizado(call)
 
-def recibir_ocasion(message):
-    user_pedidos[message.chat.id] = {"ocasion": message.text}
-    bot.send_message(message.chat.id, "¿Qué tipo de productos deseas incluir? (Ej. bombones, trufas, surtido mixto)")
-    bot.register_next_step_handler(message, recibir_productos)
+@bot.callback_query_handler(func=lambda call: call.data.startswith("ocasion_"))
+def receive_occasion(call):
+    recibir_ocasion(call)
 
-def recibir_productos(message):
-    user_pedidos[message.chat.id]["productos"] = message.text
-    bot.send_message(message.chat.id, "¿Cuántas unidades o cajas necesitas?")
-    bot.register_next_step_handler(message, recibir_cantidad)
+@bot.callback_query_handler(func=lambda call: call.data.startswith("producto_"))
+def receive_products(call):
+    recibir_productos(call)
 
-def recibir_cantidad(message):
-    user_pedidos[message.chat.id]["cantidad"] = message.text
-    bot.send_message(message.chat.id, "¿Para qué fecha necesitas el pedido?")
-    bot.register_next_step_handler(message, recibir_fecha)
+@bot.callback_query_handler(func=lambda call: call.data.startswith("cantidad_"))
+def receive_quantity(call):
+    recibir_cantidad(call)
 
-def recibir_fecha(message):
-    user_pedidos[message.chat.id]["fecha"] = message.text
-    bot.send_message(message.chat.id, "¿A qué nombre registramos el pedido?")
-    bot.register_next_step_handler(message, recibir_nombre)
+@bot.callback_query_handler(func=lambda call: call.data.startswith("fecha_"))
+def receive_date(call):
+    recibir_fecha(call)
 
-def recibir_nombre(message):
-    user_pedidos[message.chat.id]["nombre"] = message.text
-    resumen = user_pedidos[message.chat.id]
-    bot.send_message(
-        message.chat.id,
-        f"Tu pedido ha sido registrado:\n\n"
-        f"Ocasión: {resumen['ocasion']}\n"
-        f"Productos: {resumen['productos']}\n"
-        f"Cantidad: {resumen['cantidad']}\n"
-        f"Fecha: {resumen['fecha']}\n"
-        f"Nombre: {resumen['nombre']}\n\n"
-        "Un asesor se pondrá en contacto contigo para confirmar los detalles."
-    )
-    # Opcional: volver al menú principal
-    mostrar_menu_principal(message.chat.id)
+@bot.callback_query_handler(func=lambda call: call.data == "fecha")
+def seleccionar_mes(call):
+    chat_id = call.message.chat.id
+
+    meses = [
+        ("Septiembre", "mes_9"),
+        ("Octubre", "mes_10"),
+        ("Noviembre", "mes_11"),
+        ("Diciembre", "mes_12")
+    ]
+
+    markup = types.InlineKeyboardMarkup()
+    for nombre, callback in meses:
+        markup.add(types.InlineKeyboardButton(nombre, callback_data=callback))
+
+    msg = bot.send_message(chat_id, "Selecciona el mes para tu pedido:", reply_markup=markup)
+    mensajes_activos.setdefault(chat_id, []).append(msg.message_id)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("mes_"))
+def seleccionar_dia(call):
+    chat_id = call.message.chat.id
+    mes_num = int(call.data.split("_")[1])
+
+    # Elimina el mensaje del selector de mes
+    try:
+        bot.delete_message(chat_id, call.message.message_id)
+    except:
+        pass  # Por si ya fue eliminado o no se puede borrar
+
+     # Días del 1 al 30 para simplificar
+    markup = types.InlineKeyboardMarkup()
+    for dia in range(1, 31):
+        fecha_str = f"{dia:02d}/{mes_num:02d}/2025"
+        markup.add(types.InlineKeyboardButton(fecha_str, callback_data=f"fecha_{fecha_str}"))
+
+    msg = bot.send_message(chat_id, "Selecciona el día disponible:", reply_markup=markup)
+    mensajes_activos.setdefault(chat_id, []).append(msg.message_id)
+
+
+@bot.message_handler(func=lambda message: message.chat.id in user_pedidos and "nombre" not in user_pedidos[message.chat.id])
+def receive_nombre(call):
+    recibir_nombre(call)
 
 """
     Módulo para salir del chat.
@@ -166,51 +188,68 @@ def salir_del_chat(call):
 # Diccionario temporal para almacenar respuestas por usuario
 regalo_contexto = {}
 
+
+
+# TODO: SEPARAR FUNCION PARA DEJAR ESTE ARCHIVO CON SOLAMENTE RUTA
+regalo_contexto = {}
+
 @bot.callback_query_handler(func=lambda call: call.data == "regalo")
 def iniciar_recomendacion(call):
-    regalo_contexto[call.message.chat.id] = {}
+    chat_id = call.message.chat.id
+    regalo_contexto[chat_id] = {}
     markup = types.InlineKeyboardMarkup()
     opciones = [
-        ("Pareja 💕", "pareja"),
-        ("Mamá/Papá 👨‍👩‍👧", "familia"),
-        ("Amigo/a 🎉", "amigo"),
-        ("Cliente 🧑‍💼", "cliente"),
-        ("Para mí 😋", "personal")
+        ("Pareja", "pareja"),
+        ("Mamá/Papá", "familia"),
+        ("Amigo/a", "amigo"),
+        ("Cliente", "cliente"),
+        ("Para mí", "personal")
     ]
     for texto, valor in opciones:
         markup.add(types.InlineKeyboardButton(texto, callback_data=f"regalo_dest_{valor}"))
-    bot.send_message(call.message.chat.id, "¿Para quién es el regalo?", reply_markup=markup)
+
+    msg = bot.send_message(chat_id, "¿Para quién es el regalo?", reply_markup=markup)
+    mensajes_activos.setdefault(chat_id, []).append(msg.message_id)
+
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("regalo_dest_"))
 def elegir_ocasion(call):
     chat_id = call.message.chat.id
     regalo_contexto[chat_id]["destinatario"] = call.data.split("_")[-1]
+
     markup = types.InlineKeyboardMarkup()
     opciones = [
-        ("Cumpleaños 🎂", "cumple"),
-        ("Aniversario 💍", "aniversario"),
-        ("Agradecimiento 🙏", "agradecimiento"),
-        ("Evento especial 🎊", "evento"),
-        ("Solo porque sí 😋", "ocasional")
+        ("Cumpleaños", "cumple"),
+        ("Aniversario", "aniversario"),
+        ("Agradecimiento", "agradecimiento"),
+        ("Evento especial", "evento"),
+        ("Solo porque sí", "ocasional")
     ]
     for texto, valor in opciones:
         markup.add(types.InlineKeyboardButton(texto, callback_data=f"regalo_ocas_{valor}"))
-    bot.send_message(chat_id, "¿Cuál es la ocasión?", reply_markup=markup)
+
+    msg = bot.send_message(chat_id, "¿Cuál es la ocasión?", reply_markup=markup)
+    mensajes_activos.setdefault(chat_id, []).append(msg.message_id)
+
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("regalo_ocas_"))
 def elegir_estilo(call):
     chat_id = call.message.chat.id
     regalo_contexto[chat_id]["ocasion"] = call.data.split("_")[-1]
+
     markup = types.InlineKeyboardMarkup()
     opciones = [
-        ("Elegante 🎩", "elegante"),
-        ("Divertido 😄", "divertido"),
-        ("Tradicional 🍬", "tradicional"),
-        ("Sorpresivo 🎁", "sorpresivo")
+        ("Elegante", "elegante"),
+        ("Divertido", "divertido"),
+        ("Tradicional", "tradicional"),
+        ("Sorpresivo", "sorpresivo")
     ]
     for texto, valor in opciones:
         markup.add(types.InlineKeyboardButton(texto, callback_data=f"regalo_estilo_{valor}"))
-    bot.send_message(chat_id, "¿Qué estilo prefieres?", reply_markup=markup)
+
+    msg = bot.send_message(chat_id, "¿Qué estilo prefieres?", reply_markup=markup)
+    mensajes_activos.setdefault(chat_id, []).append(msg.message_id)
+
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("regalo_estilo_"))
 def mostrar_recomendacion(call):
@@ -218,29 +257,34 @@ def mostrar_recomendacion(call):
     regalo_contexto[chat_id]["estilo"] = call.data.split("_")[-1]
     datos = regalo_contexto[chat_id]
 
-    # Lógica condicional básica (puedes expandirla con más combinaciones)
     if datos["destinatario"] == "pareja" and datos["ocasion"] == "aniversario" and datos["estilo"] == "elegante":
         recomendacion = (
-            "🎁 *Recomendación personalizada:*\n\n"
+            "*Recomendación personalizada:*\n\n"
             "Te sugerimos la *Caja Duquesa*, con bombones rellenos de jalea de fresa y cobertura de chocolate amargo. "
-            "Un detalle romántico y sofisticado para celebrar el amor. 💕"
+            "Un detalle romántico y sofisticado para celebrar el amor."
         )
     elif datos["destinatario"] == "cliente":
         recomendacion = (
-            "🎁 *Recomendación personalizada:*\n\n"
+            "*Recomendación personalizada:*\n\n"
             "La *Caja Costanzo Corporativa* es ideal para clientes: elegante, neutra y con surtido variado. "
-            "Perfecta para agradecimientos profesionales. 🧑‍💼"
+            "Perfecta para agradecimientos profesionales."
         )
     else:
         recomendacion = (
-            "🎁 *Recomendación personalizada:*\n\n"
+            "*Recomendación personalizada:*\n\n"
             "Te sugerimos una *Caja Mixta*, con bombones, trufas y dulces tradicionales. "
-            "Una opción versátil que se adapta a cualquier ocasión. 🍬"
+            "Una opción versátil que se adapta a cualquier ocasión."
         )
 
-    bot.send_message(chat_id, recomendacion, parse_mode="Markdown")
+    msg1 = bot.send_message(chat_id, recomendacion, parse_mode="Markdown")
+    mensajes_activos.setdefault(chat_id, []).append(msg1.message_id)
 
-    # Opcional: eliminar contexto
+    # Botón para volver al menú
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Volver al menú principal", callback_data="reiniciar"))
+    msg2 = bot.send_message(chat_id, "¿Deseas regresar al menú?", reply_markup=markup)
+    mensajes_activos[chat_id].append(msg2.message_id)
+
     regalo_contexto.pop(chat_id, None)
 
 """
@@ -249,13 +293,8 @@ def mostrar_recomendacion(call):
     Ruta: testimonios
 """
 @bot.callback_query_handler(func=lambda call: call.data == "testimonios")
-def mostrar_testimonios(call):
-    mensajes = [
-        "📣 *Ana, CDMX:* “Pedí una caja para mi aniversario y fue perfecta. ¡Gracias Costanzo!”",
-        "📣 *Luis, SLP:* “Los chocolates rellenos de cajeta son una joya. Mi familia quedó encantada.”",
-        "📣 *María, Querétaro:* “El empaque personalizado fue lo mejor. Ideal para regalar.”"
-    ]
-    for msg in mensajes:
-        bot.send_message(call.message.chat.id, msg, parse_mode="Markdown")
+def show_clients(call):
+    mostrar_testimonios(call)
+
 
 bot.polling()

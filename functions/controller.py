@@ -14,6 +14,8 @@ telegram_token = os.getenv("telegram_token")
 bot = telebot.TeleBot(token=telegram_token)
 
 mensajes_activos = {} 
+user_pedidos = {}
+
 
 
 
@@ -80,6 +82,8 @@ def mostrar_menu_principal(chat_id):
     markup.add(types.InlineKeyboardButton("Contactanos a nuestras redes sociales.", callback_data="contacto"))
     markup.add(types.InlineKeyboardButton("Solicitar pedido personalizado", callback_data="pedido_personalizado"))
     markup.add(types.InlineKeyboardButton("Conocer la sucursal más cercana", callback_data="ubicacion"))
+    markup.add(types.InlineKeyboardButton("Recomendaciones para regalos", callback_data="regalo"))
+    markup.add(types.InlineKeyboardButton("Ver testimonio de cliente", callback_data="testimonios"))
     markup.add(types.InlineKeyboardButton("Salir", callback_data="salir"))
     
     sent = bot.send_message(chat_id, welcome_message, reply_markup=markup)
@@ -259,7 +263,6 @@ def manejar_ubicacion(message):
 
     mensajes_activos[chat_id] = ids
 
-
 def pedir_ubicacion(call):
 
     chat_id = call.message.chat.id
@@ -276,4 +279,163 @@ def pedir_ubicacion(call):
     )
 
     mensajes_activos[chat_id] = [msg.message_id]
+
+def iniciar_pedido_personalizado(call):
+    chat_id = call.message.chat.id
+    borrar_mensajes(chat_id)
+
+    # Crear botones inline con opciones de ocasión
+    markup = types.InlineKeyboardMarkup()
+    opciones = [
+        ("Cumpleaños", "ocasion_cumple"),
+        ("Aniversario", "ocasion_aniversario"),
+        ("Evento corporativo", "ocasion_evento"),
+        ("Regalo personal", "ocasion_regalo"),
+        ("Otro", "ocasion_otro")
+    ]
+    for texto, callback in opciones:
+        markup.add(types.InlineKeyboardButton(texto, callback_data=callback))
+
+    msg = bot.send_message(chat_id, "¿Para qué ocasión es tu pedido?", reply_markup=markup)
+    mensajes_activos.setdefault(chat_id, []).append(msg.message_id)
+
+def recibir_ocasion(call):
+    chat_id = call.message.chat.id
+    ocasion = call.data.split("_")[1]
+    
+    user_pedidos[chat_id] = {"ocasion": ocasion}
+
+    # Crear botones inline para tipo de producto
+    markup = types.InlineKeyboardMarkup()
+    opciones = [
+        ("Bombones", "producto_bombones"),
+        ("Trufas", "producto_trufas"),
+        ("Surtido mixto", "producto_surtido"),
+        ("Caja personalizada", "producto_personalizada"),
+        ("Otro", "producto_otro")
+    ]
+    for texto, callback in opciones:
+        markup.add(types.InlineKeyboardButton(texto, callback_data=callback))
+
+    msg = bot.send_message(chat_id, "¿Qué tipo de productos deseas incluir?", reply_markup=markup)
+    mensajes_activos.setdefault(chat_id, []).append(msg.message_id)
+
+def recibir_productos(call):
+    chat_id = call.message.chat.id
+    producto_key = call.data.split("_")[1]
+
+    if chat_id not in user_pedidos:
+        user_pedidos[chat_id] = {}
+
+    user_pedidos[chat_id]["producto"] = producto_key
+
+    nombres_legibles = {
+        "bombones": "Bombones rellenos",
+        "trufas": "Trufas artesanales",
+        "surtido": "Surtido mixto",
+        "personalizada": "Caja personalizada",
+        "otro": "Otro tipo de producto"
+    }
+
+    producto_legible = nombres_legibles.get(producto_key, producto_key.capitalize())
+
+    mensaje = (
+        f"Excelente elección: *{producto_legible}*.\n\n"
+        "¿Cuántas unidades deseas incluir en tu pedido?"
+    )
+
+    markup = types.InlineKeyboardMarkup()
+    cantidades = [("1 unidad", "cantidad_1"), ("3 unidades", "cantidad_3"), ("Caja completa", "cantidad_caja")]
+    for texto, callback in cantidades:
+        markup.add(types.InlineKeyboardButton(texto, callback_data=callback))
+
+    msg = bot.send_message(chat_id, mensaje, parse_mode="Markdown", reply_markup=markup)
+    mensajes_activos.setdefault(chat_id, []).append(msg.message_id)
+
+def recibir_cantidad(call):
+    chat_id = call.message.chat.id
+    cantidad_key = call.data.split("_")[1]
+
+    if chat_id not in user_pedidos:
+        user_pedidos[chat_id] = {}
+
+    user_pedidos[chat_id]["cantidad"] = cantidad_key
+
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Seleccionar fecha", callback_data="fecha"))
+
+    msg = bot.send_message(chat_id, "¿Para qué fecha necesitas el pedido?", reply_markup=markup)
+    mensajes_activos.setdefault(chat_id, []).append(msg.message_id)
+
+def recibir_fecha(call):
+    chat_id = call.message.chat.id
+    fecha = call.data.split("_")[1]
+
+    if chat_id not in user_pedidos:
+        user_pedidos[chat_id] = {}
+
+    user_pedidos[chat_id]["fecha"] = fecha
+
+    # Elimina el mensaje del selector de día
+    try:
+        bot.delete_message(chat_id, call.message.message_id)
+    except:
+        pass
+
+    msg = bot.send_message(chat_id, "¿A qué nombre registramos el pedido?")
+    mensajes_activos.setdefault(chat_id, []).append(msg.message_id)
+
+def recibir_nombre(message):
+    chat_id = message.chat.id
+    user_pedidos[chat_id]["nombre"] = message.text
+    resumen = user_pedidos[chat_id]
+
+    nombres_legibles = {
+        "bombones": "Bombones rellenos",
+        "trufas": "Trufas artesanales",
+        "surtido": "Surtido mixto",
+        "personalizada": "Caja personalizada",
+        "otro": "Otro tipo de producto"
+    }
+    producto_legible = nombres_legibles.get(resumen["producto"], resumen["producto"].capitalize())
+
+    mensaje_resumen = (
+        "Tu pedido ha sido registrado correctamente:\n\n"
+        f"Ocasión: {resumen['ocasion'].capitalize()}\n"
+        f"Producto: {producto_legible}\n"
+        f"Cantidad: {resumen['cantidad']}\n"
+        f"Fecha: {resumen['fecha']}\n"
+        f"Nombre: {resumen['nombre']}\n\n"
+        "Nos pondremos en contacto contigo pronto para confirmar los detalles.\n"
+        "Gracias por confiar en nosotros."
+    )
+
+    # Crear botón para volver al menú
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Volver al menú principal", callback_data="reiniciar"))
+
+    msg = bot.send_message(chat_id, mensaje_resumen, reply_markup=markup)
+    mensajes_activos.setdefault(chat_id, []).append(msg.message_id)
+
+def mostrar_testimonios(call):
+    chat_id = call.message.chat.id
+
+    # Borrar el mensaje del botón
+    try:
+        bot.delete_message(chat_id, call.message.message_id)
+    except:
+        pass
+
+    # Enviar cada testimonio y registrar sus IDs
+    mensajes_activos.setdefault(chat_id, [])
+    
+    for msg in mensajes:
+        enviado = bot.send_message(chat_id, msg, parse_mode="Markdown")
+        mensajes_activos[chat_id].append(enviado.message_id)
+
+    # Btn para volver al menú
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Volver al menú principal", callback_data="reiniciar"))
+    boton = bot.send_message(chat_id, "¿Deseas volver al menú?", reply_markup=markup)
+    mensajes_activos[chat_id].append(boton.message_id)
 
