@@ -1,5 +1,4 @@
 import os
-import time
 
 from telebot import *
 from dotenv import load_dotenv
@@ -13,7 +12,17 @@ telegram_token = os.getenv("telegram_token")
 bot = telebot.TeleBot(token=telegram_token)
 
 """
-    Este es el menú principal del bot.
+    Módulo para reiniciar el menú principal.
+    Aquí se maneja la interacción para que el usuario pueda volver al menú principal en cualquier momento.
+    Ruta: reiniciar
+"""
+@bot.callback_query_handler(func=lambda call: call.data == "reiniciar")
+def volver_al_menu(call):
+    reiniciar_menu(call)
+
+
+"""
+    Ruta para menú principal del bot.
     Espera a que el usuario envíe el comando /start para iniciar la interacción.
     Luego, muestra un menú con varias opciones utilizando botones inline.   
     
@@ -21,7 +30,8 @@ bot = telebot.TeleBot(token=telegram_token)
 """
 @bot.message_handler(commands=['start'])
 def welcome(message):
-    mostrar_menu_principal(message.chat.id)
+    msg_id = mostrar_menu_principal(message.chat.id)
+    mensajes_activos[message.chat.id] = [msg_id]
 
 
 """
@@ -32,30 +42,7 @@ def welcome(message):
 """
 @bot.callback_query_handler(func=lambda call: call.data == "preguntas_frecuentes")
 def show_faq_menu(call):
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("¿Se realizan envíos a domicilio?", callback_data="faq_envios"))
-    markup.add(types.InlineKeyboardButton("¿Cuáles son las formas de pago?", callback_data="faq_pago"))
-    markup.add(types.InlineKeyboardButton("¿Se pueden hacer regalos personalizados?", callback_data="faq_regalos"))
-    markup.add(types.InlineKeyboardButton("¿Cuál es el horario de atención?", callback_data="faq_horario"))
-
-    bot.send_message(call.message.chat.id, "Selecciona una opción:", reply_markup=markup)
-
-"""    
-    Modulo de ubicación y sucursal más cercana.
-    Aquí se maneja la interacción para obtener la ubicación del usuario y calcular la sucursal más cercana.
-    Ruta: ubicacion
-"""
-@bot.callback_query_handler(func=lambda call: call.data == "ubicacion")
-def pedir_ubicacion(call):
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    location_btn = types.KeyboardButton("📍 Enviar mi ubicación", request_location=True)
-    markup.add(location_btn)
-
-    bot.send_message(
-        call.message.chat.id,
-        "Por favor, comparte tu ubicación para ayudarte mejor:",
-        reply_markup=markup
-    )
+    mostrar_faq_menu(call)
 
 
 """
@@ -65,73 +52,10 @@ def pedir_ubicacion(call):
 """
 @bot.callback_query_handler(func=lambda call: call.data in ["faq_envios", "faq_pago", "faq_regalos", "faq_horario"])
 def answer_faq(call):
-    respuesta = faq_respuestas.get(call.data, "Lo siento, no encontré esa pregunta.")
-    bot.send_message(call.message.chat.id, respuesta, parse_mode="Markdown")
+    desplegar_respuesta_faq(call)
 
-    bot.send_message(
-        call.message.chat.id,
-        "¿Deseas ver otra pregunta frecuente?",
-        reply_markup=types.InlineKeyboardMarkup().add(
-            types.InlineKeyboardButton("Volver a preguntas frecuentes", callback_data="preguntas_frecuentes")
-        )
-    )
 
-"""
-    Módulo para recibir la ubicación del usuario y calcular la sucursal más cercana.
-    Ruta: location
-"""
-@bot.message_handler(content_types=['location'])
-def recibir_ubicacion(message):
-    lat = message.location.latitude
-    lon = message.location.longitude
 
-    remove_markup = types.ReplyKeyboardRemove()
-    sucursal, distancia = sucursal_mas_cercana(lat, lon)
-
-    bot.send_message(
-        message.chat.id,
-        f"📍 La sucursal más cercana es *{sucursal['nombre']}*, a aproximadamente *{distancia} km* de tu ubicación.",
-        parse_mode="Markdown",
-        reply_markup=remove_markup
-    )
-
-    bot.send_message(
-        message.chat.id,
-        "¿Deseas ver otra pregunta frecuente?",
-        reply_markup=types.InlineKeyboardMarkup().add(
-            types.InlineKeyboardButton("Volver a preguntas frecuentes", callback_data="preguntas_frecuentes")
-        )
-    )
-
-    bot.send_location(message.chat.id, sucursal["lat"], sucursal["lon"])
-
-    """
-    Módulo para mostrar productos.
-    Aquí se manejan la iteracion relacionadas con la visualización de productos.
-    Ruta: productos
-    """
-@bot.callback_query_handler(func=lambda call: call.data == "productos")
-def mostrar_productos(call):
-
-    # Mensaje inicial
-    bot.send_message(
-        call.message.chat.id,
-        "Te muestro los chocolates más populares de nuestra marca:"
-    )
-
-    # Mostrar productos con pausa entre cada uno
-    for producto in productos:
-        bot.send_photo(
-            call.message.chat.id,
-            photo=open(producto['imagen'], 'rb'),
-            caption=f"*{producto['nombre']}*\n{producto['descripcion']}",
-            parse_mode="Markdown"
-        )
-        time.sleep(1.5)  # Pausa de 1.5 segundos entre productos
-
-    # Mensaje final y retorno a menú principal
-    bot.send_message(call.message.chat.id, "Gracias por explorar nuestros productos. Aquí tienes el menú principal nuevamente:")
-    mostrar_menu_principal(call.message.chat.id)
 
 """
     Módulo para mostrar redes sociales.
@@ -140,22 +64,38 @@ def mostrar_productos(call):
 """
 @bot.callback_query_handler(func=lambda call: call.data == "contacto")
 def contacto_humano(call):
-    mensaje = (
-        "*¿Deseas hablar con alguien de nuestro equipo?*\n\n"
-        "Selecciona el canal que prefieras para contactarnos:"
-    )
+    mostrar_contacto(call)
 
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Telegram – Atención Costanzo", url="https://t.me/CostanzoNoOficial"))
-    markup.add(types.InlineKeyboardButton("WhatsApp – +52 444 431 2446", url="https://wa.me/524444312446"))
-    markup.add(types.InlineKeyboardButton("Facebook", url="https://www.facebook.com/share/19ks8t5XPR/"))
-    markup.add(types.InlineKeyboardButton("Instagram", url="https://www.instagram.com/chocolates_constanzo?igsh=cHF6bXBvZXU1ejRu&utm_source=qr"))
-    markup.add(types.InlineKeyboardButton("TikTok", url="https://www.tiktok.com/@constanzonooficial?_t=ZS-8zPAEMamiWO&_r=1"))
-    markup.add(types.InlineKeyboardButton("YouTube", url="https://www.youtube.com/@NoOficialChocolatesCostanzo"))
-    markup.add(types.InlineKeyboardButton("X", url="https://x.com/ConstanzoNofic?t=bChosvweDOQ1aLe416alVg&s=09"))
-    markup.add(types.InlineKeyboardButton("Volver al menú principal", callback_data="start"))
 
-    bot.send_message(call.message.chat.id, mensaje, parse_mode="Markdown", reply_markup=markup)
+"""    
+    Modulo de ubicación y sucursal más cercana. (Modulo propuesto por equipo de desarrollo)
+    Aquí se maneja la interacción para obtener la ubicación del usuario y calcular la sucursal más cercana.
+    Ruta: ubicacion
+"""
+@bot.callback_query_handler(func=lambda call: call.data == "ubicacion")
+def request_location(call):
+    pedir_ubicacion(call)
+
+
+"""
+    Módulo para recibir la ubicación del usuario y calcular la sucursal más cercana.
+    Ruta: location
+"""
+@bot.message_handler(content_types=['location'])
+def get_location(message):
+    manejar_ubicacion(message)
+
+
+"""
+    Módulo para mostrar productos.
+    Aquí se manejan la iteracion relacionadas con la visualización de productos.
+    Ruta: productos
+"""
+@bot.callback_query_handler(func=lambda call: call.data == "productos")
+def show_products(call):
+    mostrar_productos(call)
+    
+
 
 """
     Modulo para pedido personalizado.
@@ -206,6 +146,116 @@ def recibir_nombre(message):
     # Opcional: volver al menú principal
     mostrar_menu_principal(message.chat.id)
 
+"""
+    Módulo para salir del chat.
+    Aquí se maneja la interacción para que el usuario pueda salir del chat de manera amigable
+    Ruta: salir
+"""
+@bot.callback_query_handler(func=lambda call: call.data == "salir")
+def salir_del_chat(call):
+    bot.send_message(
+        call.message.chat.id,
+        "Gracias por visitar *Chocolates Costanzo* 🍫\n¡Esperamos verte pronto!"
+    )
 
+"""
+    Módulo para recomendación de regalos. (Modulo propuesto por equipo de desarrollo)
+    Aquí se maneja la interacción para recomendar regalos personalizados basados en las preferencias del usuario.
+    Ruta: regalo
+"""
+# Diccionario temporal para almacenar respuestas por usuario
+regalo_contexto = {}
+
+@bot.callback_query_handler(func=lambda call: call.data == "regalo")
+def iniciar_recomendacion(call):
+    regalo_contexto[call.message.chat.id] = {}
+    markup = types.InlineKeyboardMarkup()
+    opciones = [
+        ("Pareja 💕", "pareja"),
+        ("Mamá/Papá 👨‍👩‍👧", "familia"),
+        ("Amigo/a 🎉", "amigo"),
+        ("Cliente 🧑‍💼", "cliente"),
+        ("Para mí 😋", "personal")
+    ]
+    for texto, valor in opciones:
+        markup.add(types.InlineKeyboardButton(texto, callback_data=f"regalo_dest_{valor}"))
+    bot.send_message(call.message.chat.id, "¿Para quién es el regalo?", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("regalo_dest_"))
+def elegir_ocasion(call):
+    chat_id = call.message.chat.id
+    regalo_contexto[chat_id]["destinatario"] = call.data.split("_")[-1]
+    markup = types.InlineKeyboardMarkup()
+    opciones = [
+        ("Cumpleaños 🎂", "cumple"),
+        ("Aniversario 💍", "aniversario"),
+        ("Agradecimiento 🙏", "agradecimiento"),
+        ("Evento especial 🎊", "evento"),
+        ("Solo porque sí 😋", "ocasional")
+    ]
+    for texto, valor in opciones:
+        markup.add(types.InlineKeyboardButton(texto, callback_data=f"regalo_ocas_{valor}"))
+    bot.send_message(chat_id, "¿Cuál es la ocasión?", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("regalo_ocas_"))
+def elegir_estilo(call):
+    chat_id = call.message.chat.id
+    regalo_contexto[chat_id]["ocasion"] = call.data.split("_")[-1]
+    markup = types.InlineKeyboardMarkup()
+    opciones = [
+        ("Elegante 🎩", "elegante"),
+        ("Divertido 😄", "divertido"),
+        ("Tradicional 🍬", "tradicional"),
+        ("Sorpresivo 🎁", "sorpresivo")
+    ]
+    for texto, valor in opciones:
+        markup.add(types.InlineKeyboardButton(texto, callback_data=f"regalo_estilo_{valor}"))
+    bot.send_message(chat_id, "¿Qué estilo prefieres?", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("regalo_estilo_"))
+def mostrar_recomendacion(call):
+    chat_id = call.message.chat.id
+    regalo_contexto[chat_id]["estilo"] = call.data.split("_")[-1]
+    datos = regalo_contexto[chat_id]
+
+    # Lógica condicional básica (puedes expandirla con más combinaciones)
+    if datos["destinatario"] == "pareja" and datos["ocasion"] == "aniversario" and datos["estilo"] == "elegante":
+        recomendacion = (
+            "🎁 *Recomendación personalizada:*\n\n"
+            "Te sugerimos la *Caja Duquesa*, con bombones rellenos de jalea de fresa y cobertura de chocolate amargo. "
+            "Un detalle romántico y sofisticado para celebrar el amor. 💕"
+        )
+    elif datos["destinatario"] == "cliente":
+        recomendacion = (
+            "🎁 *Recomendación personalizada:*\n\n"
+            "La *Caja Costanzo Corporativa* es ideal para clientes: elegante, neutra y con surtido variado. "
+            "Perfecta para agradecimientos profesionales. 🧑‍💼"
+        )
+    else:
+        recomendacion = (
+            "🎁 *Recomendación personalizada:*\n\n"
+            "Te sugerimos una *Caja Mixta*, con bombones, trufas y dulces tradicionales. "
+            "Una opción versátil que se adapta a cualquier ocasión. 🍬"
+        )
+
+    bot.send_message(chat_id, recomendacion, parse_mode="Markdown")
+
+    # Opcional: eliminar contexto
+    regalo_contexto.pop(chat_id, None)
+
+"""
+    Modulo de testimonios. (Modulo propuesto por equipo de desarrollo)
+    Aquí se maneja la interacción para mostrar testimonios de clientes satisfechos.
+    Ruta: testimonios
+"""
+@bot.callback_query_handler(func=lambda call: call.data == "testimonios")
+def mostrar_testimonios(call):
+    mensajes = [
+        "📣 *Ana, CDMX:* “Pedí una caja para mi aniversario y fue perfecta. ¡Gracias Costanzo!”",
+        "📣 *Luis, SLP:* “Los chocolates rellenos de cajeta son una joya. Mi familia quedó encantada.”",
+        "📣 *María, Querétaro:* “El empaque personalizado fue lo mejor. Ideal para regalar.”"
+    ]
+    for msg in mensajes:
+        bot.send_message(call.message.chat.id, msg, parse_mode="Markdown")
 
 bot.polling()
