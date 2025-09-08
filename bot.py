@@ -50,6 +50,7 @@ def volver_al_menu(call):
 """
 @bot.message_handler(commands=['start'])
 def welcome(message):
+    print(f"Recibido /start de {message.chat.id}")
     msg_id = mostrar_menu_principal(message.chat.id)
     mensajes_activos[message.chat.id] = [msg_id]
 
