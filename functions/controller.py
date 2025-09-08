@@ -1,3 +1,5 @@
+from telebot import *
+
 from math import radians, cos, sin, sqrt, atan2
 
 sucursales = [ 
@@ -40,3 +42,22 @@ def sucursal_mas_cercana(lat_usuario, lon_usuario):
             sucursal_cercana = sucursal
 
     return sucursal_cercana, round(menor_distancia, 2)
+
+
+
+
+
+"""
+    Función para mostrar el menú principal con opciones.
+    Utiliza botones inline para que el usuario pueda seleccionar una opción.
+"""
+def mostrar_menu_principal(chat_id):
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("Preguntas frecuentes", callback_data="preguntas_frecuentes"))
+    markup.add(types.InlineKeyboardButton("Productos", callback_data="productos"))
+    markup.add(types.InlineKeyboardButton("Contactanos a nuestras redes sociales.", callback_data="contacto"))
+    markup.add(types.InlineKeyboardButton("Solicitar pedido personalizado", callback_data="pedido_personalizado"))
+    markup.add(types.InlineKeyboardButton("Conocer la sucursal más cercana", callback_data="ubicacion"))
+    markup.add(types.InlineKeyboardButton("Salir", callback_data="salir"))
+
+    bot.send_message(chat_id, welcome_message, reply_markup=markup)

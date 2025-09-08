@@ -1,4 +1,5 @@
 import os
+import time
 
 from telebot import *
 from dotenv import load_dotenv
@@ -11,28 +12,27 @@ load_dotenv()
 telegram_token = os.getenv("telegram_token")
 bot = telebot.TeleBot(token=telegram_token)
 
-# Mensaje de bienvenida y menú principal
+"""
+    Este es el menú principal del bot.
+    Espera a que el usuario envíe el comando /start para iniciar la interacción.
+    Luego, muestra un menú con varias opciones utilizando botones inline.   
+    
+    Ruta: /start 
+"""
 @bot.message_handler(commands=['start'])
 def welcome(message):
     mostrar_menu_principal(message.chat.id)
 
-def mostrar_menu_principal(chat_id):
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Preguntas frecuentes", callback_data="preguntas_frecuentes"))
-    markup.add(types.InlineKeyboardButton("Productos", callback_data="productos"))
-    markup.add(types.InlineKeyboardButton("Contactanos a nuestras redes sociales.", callback_data="contacto"))
-    markup.add(types.InlineKeyboardButton("Solicitar pedido personalizado", callback_data="pedido_personalizado"))
-    markup.add(types.InlineKeyboardButton("Salir", callback_data="salir"))
 
-    bot.send_message(chat_id, welcome_message, reply_markup=markup)
+"""
+    Modulo de preguntas frecuentes.
+    Aquí se manejan las interacciones relacionadas con las preguntas frecuentes de los usuarios.
 
-
-
-# Menu de preguntas frecuentes
+    Ruta: preguntas_frecuentes
+"""
 @bot.callback_query_handler(func=lambda call: call.data == "preguntas_frecuentes")
 def show_faq_menu(call):
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("Conocer la sucursal más cercana", callback_data="faq_ubicacion"))
     markup.add(types.InlineKeyboardButton("¿Se realizan envíos a domicilio?", callback_data="faq_envios"))
     markup.add(types.InlineKeyboardButton("¿Cuáles son las formas de pago?", callback_data="faq_pago"))
     markup.add(types.InlineKeyboardButton("¿Se pueden hacer regalos personalizados?", callback_data="faq_regalos"))
@@ -40,7 +40,12 @@ def show_faq_menu(call):
 
     bot.send_message(call.message.chat.id, "Selecciona una opción:", reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda call: call.data == "faq_ubicacion")
+"""    
+    Modulo de ubicación y sucursal más cercana.
+    Aquí se maneja la interacción para obtener la ubicación del usuario y calcular la sucursal más cercana.
+    Ruta: ubicacion
+"""
+@bot.callback_query_handler(func=lambda call: call.data == "ubicacion")
 def pedir_ubicacion(call):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     location_btn = types.KeyboardButton("📍 Enviar mi ubicación", request_location=True)
@@ -52,6 +57,12 @@ def pedir_ubicacion(call):
         reply_markup=markup
     )
 
+
+"""
+    Modulo de respuestas a preguntas frecuentes.
+    Aquí se manejan las respuestas a las preguntas frecuentes seleccionadas por el usuario.
+    Ruta: faq_envios, faq_pago, faq_regalos, faq_horario
+"""
 @bot.callback_query_handler(func=lambda call: call.data in ["faq_envios", "faq_pago", "faq_regalos", "faq_horario"])
 def answer_faq(call):
     respuesta = faq_respuestas.get(call.data, "Lo siento, no encontré esa pregunta.")
@@ -65,6 +76,10 @@ def answer_faq(call):
         )
     )
 
+"""
+    Módulo para recibir la ubicación del usuario y calcular la sucursal más cercana.
+    Ruta: location
+"""
 @bot.message_handler(content_types=['location'])
 def recibir_ubicacion(message):
     lat = message.location.latitude
@@ -88,11 +103,13 @@ def recibir_ubicacion(message):
         )
     )
 
-
     bot.send_location(message.chat.id, sucursal["lat"], sucursal["lon"])
 
-import time
-
+    """
+    Módulo para mostrar productos.
+    Aquí se manejan la iteracion relacionadas con la visualización de productos.
+    Ruta: productos
+    """
 @bot.callback_query_handler(func=lambda call: call.data == "productos")
 def mostrar_productos(call):
 
@@ -116,7 +133,11 @@ def mostrar_productos(call):
     bot.send_message(call.message.chat.id, "Gracias por explorar nuestros productos. Aquí tienes el menú principal nuevamente:")
     mostrar_menu_principal(call.message.chat.id)
 
-# Modulo de contacto humano
+"""
+    Módulo para mostrar redes sociales.
+    Esto maneja la interacción para que el usuario pueda contactar a través de redes sociales.
+    Ruta: contacto
+"""
 @bot.callback_query_handler(func=lambda call: call.data == "contacto")
 def contacto_humano(call):
     mensaje = (
@@ -136,11 +157,14 @@ def contacto_humano(call):
 
     bot.send_message(call.message.chat.id, mensaje, parse_mode="Markdown", reply_markup=markup)
 
-
+"""
+    Modulo para pedido personalizado.
+    Generacion de flujo conversacional para recopilar detalles del pedido personalizado.
+    Ruta: pedido_personalizado
+"""
 # Diccionario temporal para almacenar datos por usuario
 user_pedidos = {}
 
-# Modulo de Flujo conversacional para pedido personalizado
 @bot.callback_query_handler(func=lambda call: call.data == "pedido_personalizado")
 def iniciar_pedido(call):
     bot.send_message(call.message.chat.id, "¿Para qué ocasión es tu pedido? (Ej. cumpleaños, aniversario, evento corporativo)")
