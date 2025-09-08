@@ -12,25 +12,6 @@ telegram_token = os.getenv("telegram_token")
 bot = telebot.TeleBot(token=telegram_token)
 app = Flask(__name__)
 
-# Ruta para recibir actualizaciones desde Telegram
-@app.route(f"/{telegram_token}", methods=["POST"])
-def webhook():
-    update = types.Update.de_json(request.get_data().decode("utf-8"))
-    bot.process_new_updates([update])
-    return "OK", 200
-
-# Ruta de salud para Render
-@app.route("/", methods=["GET"])
-def index():
-    return "Bot activo", 200
-
-# Configurar webhook al iniciar
-if __name__ == "__main__":
-    bot.remove_webhook()
-    bot.set_webhook(url=f"https://telegrambot-m6gh.onrender.com/{telegram_token}")
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
-
 """
     Módulo para reiniciar el menú principal.
     Aquí se maneja la interacción para que el usuario pueda volver al menú principal en cualquier momento.
@@ -316,4 +297,22 @@ def mostrar_recomendacion(call):
 @bot.callback_query_handler(func=lambda call: call.data == "testimonios")
 def show_clients(call):
     mostrar_testimonios(call)
+    
 
+# Ruta para recibir actualizaciones desde Telegram
+@app.route(f"/{telegram_token}", methods=["POST"])
+def webhook():
+    update = types.Update.de_json(request.get_data().decode("utf-8"))
+    bot.process_new_updates([update])
+    return "OK", 200
+
+# Ruta de salud para Render
+@app.route("/", methods=["GET"])
+def index():
+    return "Bot activo", 200
+
+# Configurar webhook al iniciar
+if __name__ == "__main__":
+    bot.remove_webhook()
+    bot.set_webhook(url=f"https://telegrambot-m6gh.onrender.com/{telegram_token}")
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
