@@ -24,18 +24,11 @@ def webhook():
 def index():
     return "Bot activo", 200
 
+# Configurar webhook al iniciar
 if __name__ == "__main__":
-    bot.polling()
-
-
-
-# # Configurar webhook al iniciar
-# if __name__ == "__main__":
-#     bot.remove_webhook()
-#     bot.set_webhook(url=f"https://TU-APP-EN-RENDER.onrender.com/{telegram_token}")
-#     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
-
+    bot.remove_webhook()
+    bot.set_webhook(url=f"https://telegrambot-m6gh.onrender.com/{telegram_token}")
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 
 
 """
