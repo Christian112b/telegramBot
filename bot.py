@@ -1,5 +1,5 @@
 import os
-
+from flask import Flask, request
 from telebot import *
 from dotenv import load_dotenv
 
@@ -10,6 +10,33 @@ load_dotenv()
 
 telegram_token = os.getenv("telegram_token")
 bot = telebot.TeleBot(token=telegram_token)
+app = Flask(__name__)
+
+# Ruta para recibir actualizaciones desde Telegram
+@app.route(f"/{telegram_token}", methods=["POST"])
+def webhook():
+    update = types.Update.de_json(request.get_data().decode("utf-8"))
+    bot.process_new_updates([update])
+    return "OK", 200
+
+# Ruta de salud para Render
+@app.route("/", methods=["GET"])
+def index():
+    return "Bot activo", 200
+
+if __name__ == "__main__":
+    bot.polling()
+
+
+
+# # Configurar webhook al iniciar
+# if __name__ == "__main__":
+#     bot.remove_webhook()
+#     bot.set_webhook(url=f"https://TU-APP-EN-RENDER.onrender.com/{telegram_token}")
+#     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+
+
+
 
 """
     Módulo para reiniciar el menú principal.
@@ -296,5 +323,3 @@ def mostrar_recomendacion(call):
 def show_clients(call):
     mostrar_testimonios(call)
 
-
-bot.polling()
