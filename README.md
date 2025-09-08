@@ -19,6 +19,8 @@ Instala las dependencias necesarias con:
 
 ```bash
 pip install -r requirements.txt
+```
 
 ```bash
 python bot.py
+```
